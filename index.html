@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARCADE ULTRA</title>
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<style>
+body{
+    margin:0;
+    background:black;
+    color:#0f0;
+    font-family:Arial, sans-serif;
+    text-align:center;
+    overflow:hidden;
+    touch-action:manipulation;
+}
+
+.opcion{
+    position:absolute;
+    padding:14px 24px;
+    background:#0f0;
+    color:black;
+    border-radius:16px;
+    cursor:pointer;
+    font-weight:bold;
+    user-select:none;
+    transition: transform 0.15s, left 0.2s linear, top 0.2s linear;
+}
+.opcion:active{transform:scale(0.92);}
+
+#menu,#juego,#final{display:none}
+button,input{padding:12px; font-size:18px; border-radius:10px;}
+body.nivelUp{animation: flash .2s;}
+@keyframes flash{0%{background:#0f0;} 100%{background:black;}}
+
+@media(max-width:600px){.opcion{font-size:16px;padding:12px 18px}}
+</style>
+</head>
+
+<body>
+
+<!-- MENU -->
+<div id="menu">
+<h1>🕹️ ARCADE ULTRA</h1>
+<p>Nombre del jugador:</p>
+<input id="nombre" placeholder="Jugador"><br><br>
+<button onclick="iniciar()">JUGAR</button>
+
+<h3>🏆 Mejores puntajes</h3>
+<div id="tabla"></div>
+</div>
+
+<!-- JUEGO -->
+<div id="juego">
+<h2 id="saludo"></h2>
+<p>
+❤️ <span id="vidas">3</span> |
+⭐ <span id="puntos">0</span> |
+⏱️ <span id="tiempo">10</span> |
+🔥 Nivel <span id="nivel">1</span>
+</p>
+<h3 id="pregunta"></h3>
+</div>
+
+<!-- FINAL -->
+<div id="final">
+<h1 id="mensajeFinal"></h1>
+<button onclick="location.reload()">🔁 Jugar otra vez</button>
+</div>
+
+<!-- SONIDOS -->
+<audio id="sndOk" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-bonus-alert-767.mp3"></audio>
+<audio id="sndFail" src="https://assets.mixkit.co/sfx/preview/mixkit-player-losing-or-failing-2042.mp3"></audio>
+
+<script>
+// ===================== PREGUNTAS =====================
+const bancoPreguntas = [
+{q:"7 x 8?",o:["56","48","64","58"],c:"56"},
+{q:"144 / 12?",o:["12","10","14","11"],c:"12"},
+{q:"Raíz cuadrada de 81?",o:["9","8","7","6"],c:"9"},
+{q:"15% de 200?",o:["30","25","35","40"],c:"30"},
+{q:"Capital de Canadá?",o:["Ottawa","Toronto","Vancouver","Montreal"],c:"Ottawa"},
+{q:"Capital de Argentina?",o:["Buenos Aires","Córdoba","Rosario","La Plata"],c:"Buenos Aires"},
+{q:"País más grande del mundo?",o:["Rusia","China","EE.UU.","Canadá"],c:"Rusia"},
+{q:"Planeta más cercano al Sol?",o:["Mercurio","Venus","Marte","Tierra"],c:"Mercurio"},
+{q:"Gas que respiramos?",o:["Oxígeno","Hidrógeno","CO2","Nitrógeno"],c:"Oxígeno"},
+{q:"Órgano que bombea sangre?",o:["Corazón","Pulmón","Hígado","Riñón"],c:"Corazón"},
+{q:"Sinónimo de rápido?",o:["Veloz","Lento","Pesado","Débil"],c:"Veloz"},
+{q:"Antónimo de frío?",o:["Caliente","Húmedo","Seco","Nieve"],c:"Caliente"},
+{q:"Cuántos continentes hay?",o:["7","6","5","8"],c:"7"},
+{q:"Cuántos lados tiene un hexágono?",o:["6","5","7","8"],c:"6"},
+{q:"Capital de Japón?",o:["Tokio","Kioto","Osaka","Seúl"],c:"Tokio"}
+];
+
+// ===================== VARIABLES =====================
+let preguntas=[], jugador="";
+let puntos=0, vidas=3, tiempo=10, nivel=1;
+let velocidad=1200, velocidadMin=600;
+let reloj, actual;
+
+// ===================== RECORDS =====================
+function cargarTabla(){
+    let data=JSON.parse(localStorage.getItem("scores"))||[];
+    document.getElementById("tabla").innerHTML =
+        data.map(d=>`<p>${d.nombre}: ${d.puntos}</p>`).join("") || "Sin récords";
+}
+cargarTabla();
+
+// ===================== INICIO =====================
+document.getElementById("menu").style.display="block";
+
+function iniciar(){
+    jugador=document.getElementById("nombre").value||"Jugador";
+    preguntas=[...bancoPreguntas].sort(()=>Math.random()-0.5);
+    document.getElementById("menu").style.display="none";
+    document.getElementById("juego").style.display="block";
+    document.getElementById("saludo").innerText="Jugador: "+jugador;
+    nuevaPregunta();
+}
+
+// ===================== JUEGO =====================
+function nuevaPregunta(){
+    limpiar();
+    if(preguntas.length===0){mostrarFinal();return;}
+    tiempo=10;
+    document.getElementById("tiempo").innerText=tiempo;
+    actual=preguntas.pop();
+    document.getElementById("pregunta").innerText=actual.q;
+    reloj=setInterval(()=>{
+        tiempo--;
+        document.getElementById("tiempo").innerText=tiempo;
+        if(tiempo===0) fallar();
+    },1000);
+
+    actual.o.forEach(op=>{
+        let b=document.createElement("div");
+        b.className="opcion";
+        b.innerText=op;
+        b.onclick=()=>verificar(op);
+        document.body.appendChild(b);
+        moverAvanzado(b);
+    });
+}
+
+// Movimiento más variado
+function moverAvanzado(e){
+    let x=Math.random()*(innerWidth-140);
+    let y=Math.random()*(innerHeight-140);
+    let dx=(Math.random()*2+1)*(Math.random()<0.5?-1:1);
+    let dy=(Math.random()*2+1)*(Math.random()<0.5?-1:1);
+    e.style.left=x+"px"; e.style.top=y+"px";
+    let m=setInterval(()=>{
+        x+=dx; y+=dy;
+        if(x<=0 || x>=innerWidth-140) dx*=-1;
+        if(y<=0 || y>=innerHeight-140) dy*=-1;
+        e.style.left=x+"px"; e.style.top=y+"px";
+    },20);
+    e.dataset.m=m;
+}
+
+function verificar(r){
+    clearInterval(reloj);
+    if(r===actual.c){
+        document.getElementById("sndOk").play();
+        puntos++; document.getElementById("puntos").innerText=puntos;
+        if(puntos%4===0 && velocidad>velocidadMin){
+            nivel++; velocidad-=150;
+            document.getElementById("nivel").innerText=nivel;
+            document.body.classList.add("nivelUp");
+            setTimeout(()=>document.body.classList.remove("nivelUp"),200);
+        }
+        nuevaPregunta();
+    }else fallar();
+}
+
+function fallar(){
+    clearInterval(reloj);
+    document.getElementById("sndFail").play();
+    vidas--; document.getElementById("vidas").innerText=vidas;
+    if(vidas===0) mostrarFinal();
+    else nuevaPregunta();
+}
+
+function limpiar(){
+    document.querySelectorAll(".opcion").forEach(o=>{
+        clearInterval(o.dataset.m); o.remove();
+    });
+}
+
+// FINAL
+function mostrarFinal(){
+    document.getElementById("juego").style.display="none";
+    document.getElementById("final").style.display="block";
+    document.getElementById("mensajeFinal").innerText = `GAME OVER\n${jugador}: ${puntos} puntos`;
+
+    let data=JSON.parse(localStorage.getItem("scores"))||[];
+    data.push({nombre:jugador,puntos});
+    data.sort((a,b)=>b.puntos-a.puntos);
+    localStorage.setItem("scores",JSON.stringify(data.slice(0,5)));
+}
+
+// ===================== REGISTRO DEL SERVICE WORKER =====================
+if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').then(()=>{
+        console.log('Service Worker registrado!');
+    });
+}
+</script>
+
+</body>
+</html>
+
