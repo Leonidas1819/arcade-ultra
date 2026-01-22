@@ -2,215 +2,372 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<title>El Trival</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ARCADE ULTRA</title>
-
-<!-- PWA Manifest -->
-<link rel="manifest" href="manifest.json">
 
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
 body{
     margin:0;
     background:black;
-    color:#0f0;
-    font-family:Arial, sans-serif;
-    text-align:center;
+    color:#00ff66;
+    font-family:'Press Start 2P', monospace;
     overflow:hidden;
-    touch-action:manipulation;
+}
+
+/* ================= MENÚ ================= */
+#menu{
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.menu-box{
+    width:320px;
+    text-align:center;
+}
+
+.menu-box h1{
+    margin-bottom:20px;
+}
+
+.menu-box input{
+    width:100%;
+    box-sizing:border-box;
+}
+
+.menu-box button{
+    width:100%;
+    margin-top:12px;
+}
+
+#tabla{
+    font-size:10px;
+    margin-top:20px;
+}
+
+.instrucciones{
+    margin-top:40px;
+    font-size:9px;
+    line-height:1.6;
+    opacity:.9;
+}
+
+/* ================= JUEGO ================= */
+#juego{
+    display:none;
+    text-align:center;
+}
+
+#hud{
+    font-size:10px;
+    padding:10px;
+}
+
+#pregunta{
+    padding:10px;
+}
+
+/* ================= BOTONES ================= */
+button,input{
+    font-family:inherit;
+    padding:10px;
+    border:2px solid #00ff66;
+    background:black;
+    color:#00ff66;
+}
+
+button:hover{
+    background:#00ff66;
+    color:black;
 }
 
 .opcion{
     position:absolute;
-    padding:14px 24px;
-    background:#0f0;
-    color:black;
-    border-radius:16px;
+    padding:10px 14px;
+    border:2px solid #00ff66;
     cursor:pointer;
-    font-weight:bold;
     user-select:none;
-    transition: transform 0.15s, left 0.2s linear, top 0.2s linear;
 }
-.opcion:active{transform:scale(0.92);}
 
-#menu,#juego,#final{display:none}
-button,input{padding:12px; font-size:18px; border-radius:10px;}
-body.nivelUp{animation: flash .2s;}
-@keyframes flash{0%{background:#0f0;} 100%{background:black;}}
+/* ================= PAUSA ================= */
+#pausa{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.9);
+    justify-content:center;
+    align-items:center;
+    flex-direction:column;
+}
 
-@media(max-width:600px){.opcion{font-size:16px;padding:12px 18px}}
+/* ================= FINAL ================= */
+#final{
+    display:none;
+    height:100vh;
+    justify-content:center;
+    align-items:center;
+    flex-direction:column;
+    text-align:center;
+}
 </style>
 </head>
 
 <body>
 
-<!-- MENU -->
+<!-- MENÚ -->
 <div id="menu">
-<h1>🕹️ ARCADE ULTRA</h1>
-<p>Nombre del jugador:</p>
-<input id="nombre" placeholder="Jugador"><br><br>
-<button onclick="iniciar()">JUGAR</button>
+  <div class="menu-box">
+    <h1>EL TRIVAL</h1>
 
-<h3>🏆 Mejores puntajes</h3>
-<div id="tabla"></div>
+    <input id="nombre" placeholder="JUGADOR">
+    <button onclick="game.start()">▶ INICIAR</button>
+
+    <div id="tabla"></div>
+
+    <div class="instrucciones">
+      INSTRUCCIONES<br><br>
+      • Toca la respuesta correcta<br>
+      • No uses teclado<br>
+      • ⏱️ 10 segundos por pregunta<br>
+      • ❤️ 3 vidas<br>
+      • ⏸ Pausa disponible
+    </div>
+  </div>
 </div>
 
 <!-- JUEGO -->
 <div id="juego">
-<h2 id="saludo"></h2>
-<p>
-❤️ <span id="vidas">3</span> |
-⭐ <span id="puntos">0</span> |
-⏱️ <span id="tiempo">10</span> |
-🔥 Nivel <span id="nivel">1</span>
-</p>
-<h3 id="pregunta"></h3>
+  <div id="hud">
+    ❤️ <span id="vidas">3</span> |
+    ⭐ <span id="puntos">0</span> |
+    ⏱️ <span id="tiempo">10</span>
+    <button onclick="game.togglePause()">⏸</button>
+  </div>
+  <h3 id="pregunta"></h3>
+</div>
+
+<!-- PAUSA -->
+<div id="pausa">
+  <h1>PAUSA</h1>
+  <button onclick="game.togglePause()">▶ CONTINUAR</button>
+  <button onclick="game.backToMenu()">⬅ MENÚ</button>
 </div>
 
 <!-- FINAL -->
 <div id="final">
-<h1 id="mensajeFinal"></h1>
-<button onclick="location.reload()">🔁 Jugar otra vez</button>
+  <h1 id="mensajeFinal"></h1>
+  <button onclick="game.start()">↻ JUGAR OTRA VEZ</button>
+  <button onclick="game.backToMenu()">⬅ MENÚ</button>
 </div>
 
-<!-- SONIDOS -->
-<audio id="sndOk" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-bonus-alert-767.mp3"></audio>
-<audio id="sndFail" src="https://assets.mixkit.co/sfx/preview/mixkit-player-losing-or-failing-2042.mp3"></audio>
-
 <script>
-// ===================== PREGUNTAS =====================
-const bancoPreguntas = [
-{q:"7 x 8?",o:["56","48","64","58"],c:"56"},
-{q:"144 / 12?",o:["12","10","14","11"],c:"12"},
-{q:"Raíz cuadrada de 81?",o:["9","8","7","6"],c:"9"},
-{q:"15% de 200?",o:["30","25","35","40"],c:"30"},
-{q:"Capital de Canadá?",o:["Ottawa","Toronto","Vancouver","Montreal"],c:"Ottawa"},
-{q:"Capital de Argentina?",o:["Buenos Aires","Córdoba","Rosario","La Plata"],c:"Buenos Aires"},
-{q:"País más grande del mundo?",o:["Rusia","China","EE.UU.","Canadá"],c:"Rusia"},
-{q:"Planeta más cercano al Sol?",o:["Mercurio","Venus","Marte","Tierra"],c:"Mercurio"},
-{q:"Gas que respiramos?",o:["Oxígeno","Hidrógeno","CO2","Nitrógeno"],c:"Oxígeno"},
-{q:"Órgano que bombea sangre?",o:["Corazón","Pulmón","Hígado","Riñón"],c:"Corazón"},
-{q:"Sinónimo de rápido?",o:["Veloz","Lento","Pesado","Débil"],c:"Veloz"},
-{q:"Antónimo de frío?",o:["Caliente","Húmedo","Seco","Nieve"],c:"Caliente"},
-{q:"Cuántos continentes hay?",o:["7","6","5","8"],c:"7"},
-{q:"Cuántos lados tiene un hexágono?",o:["6","5","7","8"],c:"6"},
-{q:"Capital de Japón?",o:["Tokio","Kioto","Osaka","Seúl"],c:"Tokio"}
-];
+const $=id=>document.getElementById(id);
 
-// ===================== VARIABLES =====================
-let preguntas=[], jugador="";
-let puntos=0, vidas=3, tiempo=10, nivel=1;
-let velocidad=1200, velocidadMin=600;
-let reloj, actual;
-
-// ===================== RECORDS =====================
-function cargarTabla(){
-    let data=JSON.parse(localStorage.getItem("scores"))||[];
-    document.getElementById("tabla").innerHTML =
-        data.map(d=>`<p>${d.nombre}: ${d.puntos}</p>`).join("") || "Sin récords";
-}
-cargarTabla();
-
-// ===================== INICIO =====================
-document.getElementById("menu").style.display="block";
-
-function iniciar(){
-    jugador=document.getElementById("nombre").value||"Jugador";
-    preguntas=[...bancoPreguntas].sort(()=>Math.random()-0.5);
-    document.getElementById("menu").style.display="none";
-    document.getElementById("juego").style.display="block";
-    document.getElementById("saludo").innerText="Jugador: "+jugador;
-    nuevaPregunta();
+/* 🔊 Sonido retro */
+const ctx=new (window.AudioContext||window.webkitAudioContext)();
+function beep(f,d){
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.frequency.value=f;
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+d);
+    o.stop(ctx.currentTime+d);
 }
 
-// ===================== JUEGO =====================
-function nuevaPregunta(){
-    limpiar();
-    if(preguntas.length===0){mostrarFinal();return;}
-    tiempo=10;
-    document.getElementById("tiempo").innerText=tiempo;
-    actual=preguntas.pop();
-    document.getElementById("pregunta").innerText=actual.q;
-    reloj=setInterval(()=>{
-        tiempo--;
-        document.getElementById("tiempo").innerText=tiempo;
-        if(tiempo===0) fallar();
-    },1000);
-
-    actual.o.forEach(op=>{
-        let b=document.createElement("div");
-        b.className="opcion";
-        b.innerText=op;
-        b.onclick=()=>verificar(op);
-        document.body.appendChild(b);
-        moverAvanzado(b);
-    });
+/* 🧠 Preguntas */
+function generarPreguntas(){
+    const base=[
+    ["País más grande del mundo","Rusia",["Rusia","China","Canadá","EE.UU"]],
+        ["Capital de Japón","Tokio",["Tokio","Kioto","Seúl","Osaka"]],
+        ["18 ÷ 3","6",["5","6","7","9"]],
+        ["Planeta más cercano al Sol","Mercurio",["Venus","Marte","Mercurio","Júpiter"]],
+        ["Antónimo de rápido","Lento",["Lento","Ágil","Pronto","Breve"]],
+        ["5 × 6","30",["25","30","35","20"]],
+        ["Capital de México","Ciudad de México",["Guadalajara","Monterrey","Ciudad de México","Puebla"]],
+        ["Océano más grande","Pacífico",["Atlántico","Índico","Pacífico","Ártico"]],
+        ["Raíz cuadrada de 81","9",["7","8","9","10"]],
+        ["Sinónimo de feliz","Contento",["Triste","Contento","Enojado","Cansado"]],
+        ["Planeta rojo","Marte",["Júpiter","Venus","Marte","Saturno"]],
+        ["7 + 8","15",["14","15","16","17"]],
+        ["Lenguaje usado para páginas web","HTML",["Python","HTML","C++","Java"]],
+        ["Capital de Francia","París",["Roma","Madrid","París","Berlín"]],
+        ["100 ÷ 4","25",["20","25","30","40"]],
+        ["Animal más grande del mundo","Ballena azul",["Elefante","Ballena azul","Tiburón","Jirafa"]],
+        ["Antónimo de oscuro","Claro",["Negro","Tenue","Claro","Sombrío"]],
+        ["6 × 9","54",["45","54","56","49"]],
+        ["Gas que respiramos","Oxígeno",["Nitrógeno","Oxígeno","Hidrógeno","Helio"]],
+        ["Capital de Italia","Roma",["Venecia","Milán","Roma","Nápoles"]],
+        ["50 + 25","75",["65","70","75","80"]],
+        ["Estrella del sistema solar","Sol",["Luna","Sol","Marte","Júpiter"]],
+        ["Lenguaje de programación para microcontroladores","C",["HTML","C","PHP","CSS"]],
+        ["Capital de España","Madrid",["Barcelona","Madrid","Sevilla","Valencia"]],
+        ["9 × 8","72",["64","70","72","80"]],
+        ["Antónimo de frío","Caliente",["Helado","Fresco","Caliente","Tibio"]],
+        ["Instrumento para medir voltaje","Multímetro",["Amperímetro","Multímetro","Ohmímetro","Regla"]],
+        ["Planeta con anillos","Saturno",["Marte","Saturno","Urano","Venus"]],
+        ["60 ÷ 5","12",["10","11","12","15"]],
+        ["Capital de Argentina","Buenos Aires",["Córdoba","Rosario","Buenos Aires","La Plata"]],
+        ["Sinónimo de grande","Enorme",["Pequeño","Corto","Enorme","Bajo"]],
+        ["4²","16",["8","12","16","20"]],
+        ["Lenguaje usado en PIC BASIC PRO","BASIC",["C","BASIC","Python","Java"]],
+        ["Capital de Brasil","Brasilia",["Río de Janeiro","São Paulo","Brasilia","Salvador"]],
+        ["15 − 7","8",["6","7","8","9"]],
+        ["Antónimo de alto","Bajo",["Grande","Bajo","Ancho","Largo"]],
+        ["Unidad de resistencia eléctrica","Ohm",["Volt","Ampere","Ohm","Watt"]],
+        ["Planeta más grande","Júpiter",["Saturno","Neptuno","Júpiter","Urano"]],
+        ["3 × 12","36",["30","32","36","40"]],
+        ["Capital de Chile","Santiago",["Valparaíso","Concepción","Santiago","La Serena"]],
+        ["Sinónimo de rápido","Veloz",["Lento","Veloz","Pesado","Tarde"]],
+        ["Número binario de 2","10",["01","10","11","100"]],
+        ["Capital de Perú","Lima",["Cusco","Arequipa","Lima","Piura"]],
+        ["8 + 12","20",["18","19","20","22"]],
+        ["Antónimo de feliz","Triste",["Alegre","Triste","Contento","Animado"]],
+        ["Dispositivo para mostrar texto","LCD",["LED","LCD","Sensor","Relay"]]
+    ];
+    let P=[];
+    while(P.length<200){
+        let q=base[Math.floor(Math.random()*base.length)];
+        P.push({q:q[0],c:q[1],o:[...q[2]].sort(()=>Math.random()-.5)});
+    }
+    return P.sort(()=>Math.random()-.5);
 }
 
-// Movimiento más variado
-function moverAvanzado(e){
-    let x=Math.random()*(innerWidth-140);
-    let y=Math.random()*(innerHeight-140);
-    let dx=(Math.random()*2+1)*(Math.random()<0.5?-1:1);
-    let dy=(Math.random()*2+1)*(Math.random()<0.5?-1:1);
-    e.style.left=x+"px"; e.style.top=y+"px";
-    let m=setInterval(()=>{
-        x+=dx; y+=dy;
-        if(x<=0 || x>=innerWidth-140) dx*=-1;
-        if(y<=0 || y>=innerHeight-140) dy*=-1;
-        e.style.left=x+"px"; e.style.top=y+"px";
-    },20);
-    e.dataset.m=m;
+/* 🎮 GAME */
+class Game{
+    constructor(){
+        this.ui={
+            menu:$("menu"),juego:$("juego"),final:$("final"),
+            pausa:$("pausa"),nombre:$("nombre"),
+            pregunta:$("pregunta"),puntos:$("puntos"),
+            vidas:$("vidas"),tiempo:$("tiempo"),
+            tabla:$("tabla"),mensajeFinal:$("mensajeFinal")
+        };
+        this.loadScores();
+    }
+
+    start(){
+        beep(900,.1);
+        this.paused=false;
+        this.preguntas=generarPreguntas();
+        this.p=0; this.v=3;
+        this.ui.menu.style.display="none";
+        this.ui.final.style.display="none";
+        this.ui.juego.style.display="block";
+        this.next();
+    }
+
+    next(){
+        this.clear();
+        this.actual=this.preguntas.pop();
+        this.ui.pregunta.textContent=this.actual.q;
+
+        let t=10;
+        this.ui.tiempo.textContent=t;
+        this.timer=setInterval(()=>{
+            if(this.paused)return;
+            t--;
+            this.ui.tiempo.textContent=t;
+            if(t===0)this.fail();
+        },1000);
+
+        this.actual.o.forEach(op=>this.spawnOption(op));
+    }
+
+    spawnOption(text){
+        const e=document.createElement("div");
+        e.className="opcion";
+        e.textContent=text;
+        e.onclick=()=>!this.paused&&this.check(text);
+        document.body.appendChild(e);
+
+        let x=Math.random()*(innerWidth-140);
+        let y=innerHeight*0.6+Math.random()*180;
+        let dx=(Math.random()*3+1)*(Math.random()<.5?-1:1);
+        let dy=(Math.random()*3+1)*(Math.random()<.5?-1:1);
+
+        e._m=setInterval(()=>{
+            if(this.paused)return;
+            x+=dx; y+=dy;
+            if(x<0||x>innerWidth-140)dx*=-1;
+            if(y<innerHeight*0.55||y>innerHeight-60)dy*=-1;
+            e.style.left=x+"px";
+            e.style.top=y+"px";
+        },20);
+    }
+
+    check(r){
+        clearInterval(this.timer);
+        r===this.actual.c ? this.ok() : this.fail();
+    }
+
+    ok(){
+        beep(1200,.1);
+        this.p++;
+        this.ui.puntos.textContent=this.p;
+        this.next();
+    }
+
+    fail(){
+        beep(200,.2);
+        this.v--;
+        this.ui.vidas.textContent=this.v;
+        this.v<=0?this.end():this.next();
+    }
+
+    togglePause(){
+        this.paused=!this.paused;
+        this.ui.pausa.style.display=this.paused?"flex":"none";
+    }
+
+    clear(){
+        document.querySelectorAll(".opcion").forEach(o=>{
+            clearInterval(o._m);
+            o.remove();
+        });
+    }
+
+    end(){
+        this.saveScore();
+        this.ui.juego.style.display="none";
+        this.ui.final.style.display="flex";
+        this.ui.mensajeFinal.textContent=`FIN DEL JUEGO\nPUNTOS: ${this.p}`;
+    }
+
+    backToMenu(){
+        this.clear();
+        clearInterval(this.timer);
+        this.paused=false;
+
+        this.ui.juego.style.display="none";
+        this.ui.final.style.display="none";
+        this.ui.pausa.style.display="none";
+        this.ui.menu.style.display="flex";
+
+        this.ui.puntos.textContent="0";
+        this.ui.vidas.textContent="3";
+        this.ui.tiempo.textContent="10";
+    }
+
+    saveScore(){
+        let d=JSON.parse(localStorage.getItem("scores"))||[];
+        d.push({nombre:this.ui.nombre.value||"JUGADOR",puntos:this.p});
+        d.sort((a,b)=>b.puntos-a.puntos);
+        localStorage.setItem("scores",JSON.stringify(d.slice(0,5)));
+        this.loadScores();
+    }
+
+    loadScores(){
+        let d=JSON.parse(localStorage.getItem("scores"))||[];
+        this.ui.tabla.innerHTML=d.length
+            ? d.map((e,i)=>`${i+1}.- ${(e.nombre||"JUGADOR").substring(0,10)} - ${e.puntos}`).join("<br>")
+            : "Sin récords";
+    }
 }
 
-function verificar(r){
-    clearInterval(reloj);
-    if(r===actual.c){
-        document.getElementById("sndOk").play();
-        puntos++; document.getElementById("puntos").innerText=puntos;
-        if(puntos%4===0 && velocidad>velocidadMin){
-            nivel++; velocidad-=150;
-            document.getElementById("nivel").innerText=nivel;
-            document.body.classList.add("nivelUp");
-            setTimeout(()=>document.body.classList.remove("nivelUp"),200);
-        }
-        nuevaPregunta();
-    }else fallar();
-}
-
-function fallar(){
-    clearInterval(reloj);
-    document.getElementById("sndFail").play();
-    vidas--; document.getElementById("vidas").innerText=vidas;
-    if(vidas===0) mostrarFinal();
-    else nuevaPregunta();
-}
-
-function limpiar(){
-    document.querySelectorAll(".opcion").forEach(o=>{
-        clearInterval(o.dataset.m); o.remove();
-    });
-}
-
-// FINAL
-function mostrarFinal(){
-    document.getElementById("juego").style.display="none";
-    document.getElementById("final").style.display="block";
-    document.getElementById("mensajeFinal").innerText = `GAME OVER\n${jugador}: ${puntos} puntos`;
-
-    let data=JSON.parse(localStorage.getItem("scores"))||[];
-    data.push({nombre:jugador,puntos});
-    data.sort((a,b)=>b.puntos-a.puntos);
-    localStorage.setItem("scores",JSON.stringify(data.slice(0,5)));
-}
-
-// ===================== REGISTRO DEL SERVICE WORKER =====================
-if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('sw.js').then(()=>{
-        console.log('Service Worker registrado!');
-    });
-}
+const game=new Game();
 </script>
-
 </body>
 </html>
-
